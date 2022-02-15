@@ -13,41 +13,80 @@ def make_axes(
         major_tick_distance=0.1, major_tick_height=0.05,
         minor_tick_distance=0.01, minor_tick_height=0.005,
         color_positive=(0.1, 0.1, 0.1, 1), color_negative=(0.3, 0.3, 0.3, 1)):
-    def _add_x_tick(linesegs, axis_length, tick_distance, tick_height):
+    forward = p3d.Vec3.forward()
+    up = p3d.Vec3.up()
+
+    def _add_tick(linesegs, axis_length, tick_distance, tick_height):
         n_ticks = int(axis_length / tick_distance)
-        for i in range(n_ticks):
-            point = p3d.Vec3.forward() * tick_distance * i
+        for i in range(1, n_ticks + 1):
+            point = forward * tick_distance * i
             linesegs.move_to(point)
-            linesegs.draw_to(point + p3d.Vec3.up() * tick_height)
+            linesegs.draw_to(point + up * tick_height)
+
+    def _add_tick_x(linesegs, axis_length, tick_distance, tick_height):
+        n_ticks = int(axis_length / tick_distance)
+        for i in range(1, n_ticks + 1):
+            point = forward * tick_distance * i
+            linesegs.move_to(point + (-up + forward) * tick_height)
+            linesegs.draw_to(point + (up + -forward) * tick_height)
+            linesegs.move_to(point + (-up + -forward) * tick_height)
+            linesegs.draw_to(point + (up + forward) * tick_height)
+
+    def _add_tick_y(linesegs, axis_length, tick_distance, tick_height):
+        n_ticks = int(axis_length / tick_distance)
+        for i in range(1, n_ticks + 1):
+            point = forward * tick_distance * i
+            linesegs.move_to(point)
+            linesegs.draw_to(point + (up + forward) * tick_height)
+            linesegs.move_to(point)
+            linesegs.draw_to(point + (up + -forward) * tick_height)
+            linesegs.move_to(point)
+            linesegs.draw_to(point + -up * tick_height)
+
+    def _add_tick_z(linesegs, axis_length, tick_distance, tick_height):
+        n_ticks = int(axis_length / tick_distance)
+        for i in range(1, n_ticks + 1):
+            point = forward * tick_distance * i
+            linesegs.move_to(point + (up + -forward) * tick_height)
+            linesegs.draw_to(point + (up + forward) * tick_height)
+            linesegs.draw_to(point + (-up + -forward) * tick_height)
+            linesegs.draw_to(point + (-up + forward) * tick_height)
 
     def _make_axis(
-            color, length,
+            major_tick_symbol, color, length,
             major_tick_distance, major_tick_height,
             minor_tick_distance, minor_tick_height):
         ls = p3d.LineSegs()
         ls.set_color(color)
         ls.move_to(p3d.Vec3())
-        ls.draw_to(p3d.Vec3.forward() * length)
-        _add_x_tick(ls, length, major_tick_distance, major_tick_height)
-        _add_x_tick(ls, length, minor_tick_distance, minor_tick_height)
+        ls.draw_to(forward * length)
+        _add_tick(ls, length, minor_tick_distance, minor_tick_height)
+        if major_tick_symbol == 'x':
+            _add_tick_x(ls, length, major_tick_distance, major_tick_height)
+        elif major_tick_symbol == 'y':
+            _add_tick_y(ls, length, major_tick_distance, major_tick_height)
+        elif major_tick_symbol == 'z':
+            _add_tick_z(ls, length, major_tick_distance, major_tick_height)
+        else:
+            assert(False)
         return ls.create()
 
-    axis = p3d.GeomNode('axis')
-    axis.add_geoms_from(_make_axis(
-        color_positive, length,
-        major_tick_distance, major_tick_height,
-        minor_tick_distance, minor_tick_height))
-    axis.add_geoms_from(_make_axis(
-        color_negative, -length,
-        -major_tick_distance, major_tick_height,
-        -minor_tick_distance, minor_tick_height))
-    axis = p3d.NodePath(axis)
-
     axes = p3d.NodePath('axes')
-    for axis_vector in [p3d.Vec3.unit_x(), p3d.Vec3.unit_y(), p3d.Vec3.unit_z()]:
-        a = axes.attach_new_node('axis')
-        a.look_at(axis_vector)
-        axis.instance_to(a)
+    for major_tick_symbol, axis_vector in [
+            ('x', p3d.Vec3.unit_x()),
+            ('y', p3d.Vec3.unit_y()),
+            ('z', p3d.Vec3.unit_z())]:
+        axis = p3d.GeomNode('axis')
+        axis.add_geoms_from(_make_axis(
+            major_tick_symbol, color_positive, length,
+            major_tick_distance, major_tick_height,
+            minor_tick_distance, minor_tick_height))
+        axis.add_geoms_from(_make_axis(
+            major_tick_symbol, color_negative, -length,
+            -major_tick_distance, major_tick_height,
+            -minor_tick_distance, minor_tick_height))
+        axis = axes.attach_new_node(axis)
+        axis.look_at(axis_vector)
     return axes
 
 
@@ -108,9 +147,9 @@ def make_grid(label, normal, center, color=(0.35, 0.35, 0.35, 1)):
     return plane
 
 
-def make_cursor(size):
+def make_cursor(size, color=(1, 1, 1, 1)):
     ls = p3d.LineSegs('cursor')
-    ls.set_color(1, 1, 1, 1)
+    ls.set_color(color)
     s = size / 2
     ls.move_to(-s, 0, 0)
     ls.draw_to(s, 0, 0)
@@ -121,10 +160,10 @@ def make_cursor(size):
     return p3d.NodePath(ls.create())
 
 
-def make_axis_label(name):
+def make_axis_label(name, color=(0.1, 0.1, 0.1, 1)):
     label = p3d.TextNode('axis_label_' + name)
-    label.setText(name)
-    label.setTextColor(0.1, 0.1, 0.1, 1)
+    label.set_text(name)
+    label.set_text_color(color)
     return p3d.NodePath(label)
 
 
@@ -144,13 +183,7 @@ def point_ss_to_line_ws(scene, camera, lens, point_ss):
 def point_ws_to_point_ss(scene, camera, lens, point_ws):
     point_ws = transform_coordinate_system(point_ws, scene, camera)
     point_ss = p3d.Point2()
-    r = lens.project(point_ws, point_ss)
-    if r:
-        if lens.aspect_ratio < 1:
-            point_ss.y /= lens.aspect_ratio
-        else:
-            point_ss.x *= lens.aspect_ratio
-    return point_ss
+    return lens.project(point_ws, point_ss) and point_ss
 
 
 def pick(scene, camera, lens, mouse_position):
@@ -167,17 +200,15 @@ def pick(scene, camera, lens, mouse_position):
         return None
     chq.sort_entries()
     ce = chq.entries[0]
-    # if ce.get_surface_point(camera).y < 0:
-        # return None
     return ce.get_surface_point(scene)
 
 
 def get_mouse_position(window):
     pointer = window.get_pointer(0)
     window_size = window.get_size()
-    position_relative = p3d.Vec2()
-    position_relative[0] = 2 * pointer.x / window_size[0] - 1
-    position_relative[1] = -(2 * pointer.y / window_size[1] - 1)
+    position_relative = p3d.Vec2(
+        2 * pointer.x / window_size[0] - 1,
+        -(2 * pointer.y / window_size[1] - 1))
     return position_relative
 
 
@@ -205,21 +236,26 @@ def main():
     # p3d.loadPrcFileData('', 'coordinate-system zup_left')
     # p3d.loadPrcFileData('', 'coordinate-system yup_right')
 
-    make_grid('back', p3d.Vec3.back(), p3d.Vec3.forward()).reparent_to(base.render)
-    make_grid('ground', p3d.Vec3.up(), p3d.Vec3.down()).reparent_to(base.render)
-    make_grid('left', p3d.Vec3.right(), p3d.Vec3.left()).reparent_to(base.render)
-    make_axes(10, 1, 0.05, 0.1, 0.02).reparent_to(base.render)
+    right = p3d.Vec3.right()
+    forward = p3d.Vec3.forward()
+    up = p3d.Vec3.up()
+
+    axis_length = 3
+    make_grid('back', -forward, forward).reparent_to(base.render)
+    make_grid('ground', up, -up).reparent_to(base.render)
+    make_grid('left', right, -right).reparent_to(base.render)
+    make_axes(axis_length, 1, 0.02, 0.1, 0.02).reparent_to(base.render)
     make_cursor(0.05).reparent_to(base.render)
     cursor = base.render.find('cursor')
 
-    label_scale = 0.04
+    text_scale = 16
     axis_labels = [
         make_axis_label('X'),
         make_axis_label('Y'),
         make_axis_label('Z')]
     for label in axis_labels:
-        label.set_scale(label_scale)
-        label.reparent_to(base.aspect2d)
+        label.set_scale(text_scale)
+        label.reparent_to(base.pixel2d)
 
     mouse_wheel_delta = 0
     def _mouse_wheel_listener(delta):
@@ -244,12 +280,17 @@ def main():
     drag_ground_start_intersection = None
     orbit_start_intersection = None
     while True:
-        for label, point in zip(axis_labels, [(1, 0, 0), (0, 1, 0), (0, 0, 1)]):
+        # axis labels
+        for label, point in zip(axis_labels, [(axis_length * 1.04, 0, 0), (0, axis_length * 1.04, 0), (0, 0, axis_length * 1.04)]):
             point = point_ws_to_point_ss(base.render, base.camera, base.camLens, point)
             if point:
+                window_size = base.win.get_size()
+                point = p3d.Vec2(point + 1) / 2
+                point = p3d.Vec2(point.x * window_size[0], point.y * window_size[1])
+                point.y = -(window_size[1] - point.y)
                 label_offset = p3d.Vec2(
                     -label.node().get_width() / 2,
-                    -label.node().get_height() / 2) * label_scale
+                    -label.node().get_width() / 2) * text_scale
                 label.set_pos(position_rfu_to_xyz(
                     label_offset.x + point.x, 0, label_offset.y + point.y))
                 label.show()
@@ -267,9 +308,9 @@ def main():
             cursor.hide()
 
         # keyboard dolly
-        rotate_h = p3d.LRotation(p3d.Vec3.up(), base.camera.get_h())
-        camera_forward = rotate_h.xform(p3d.Vec3.forward())
-        camera_right = rotate_h.xform(p3d.Vec3.right())
+        rotate_h = p3d.LRotation(up, base.camera.get_h())
+        camera_forward = rotate_h.xform(forward)
+        camera_right = rotate_h.xform(right)
         if is_down(p3d.KeyboardButton.ascii_key('w')):
             base.camera.set_pos(base.camera.get_pos() + camera_forward * camera['speed'])
         if is_down(p3d.KeyboardButton.ascii_key('s')):
@@ -294,8 +335,10 @@ def main():
             if not drag_start_intersection and intersection:
                 drag_start_intersection = intersection
             if drag_start_intersection:
-                _mouse_drag(base.render, base.camera, base.camLens, mouse_position,
-                           drag_start_intersection, camera_forward)
+                drag_plane_normal = base.render.getRelativeVector(base.camera, forward)
+                _mouse_drag(
+                    base.render, base.camera, base.camLens,
+                    mouse_position, drag_start_intersection, drag_plane_normal)
         else:
             drag_start_intersection = None
 
@@ -304,8 +347,9 @@ def main():
             if not drag_ground_start_intersection and intersection:
                 drag_ground_start_intersection = intersection
             if drag_ground_start_intersection:
-                _mouse_drag(base.render, base.camera, base.camLens, mouse_position,
-                           drag_ground_start_intersection, p3d.Vec3.up())
+                _mouse_drag(
+                    base.render, base.camera, base.camLens,
+                    mouse_position, drag_ground_start_intersection, up)
         else:
             drag_ground_start_intersection = None
 
@@ -345,6 +389,22 @@ def main():
         elif is_down(p3d.KeyboardButton.ascii_key('0')):
             base.camera.set_pos(camera['default_position'])
             base.camera.set_hpr(camera['default_rotation'])
+        elif is_down(p3d.KeyboardButton.ascii_key('1')):
+            p3d.loadPrcFileData('', 'coordinate-system zup_right')
+            right = p3d.Vec3.right()
+            forward = p3d.Vec3.forward()
+            up = p3d.Vec3.up()
+        elif is_down(p3d.KeyboardButton.ascii_key('2')):
+            p3d.loadPrcFileData('', 'coordinate-system yup_right')
+            right = p3d.Vec3.right()
+            forward = p3d.Vec3.forward()
+            up = p3d.Vec3.up()
+        elif is_down(p3d.KeyboardButton.ascii_key('3')):
+            p3d.loadPrcFileData('', 'coordinate-system zup_left')
+            right = p3d.Vec3.right()
+            forward = p3d.Vec3.forward()
+            up = p3d.Vec3.up()
+
 
         direct.task.TaskManagerGlobal.taskMgr.step()
 
