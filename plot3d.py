@@ -389,22 +389,6 @@ def main():
         elif is_down(p3d.KeyboardButton.ascii_key('0')):
             base.camera.set_pos(camera['default_position'])
             base.camera.set_hpr(camera['default_rotation'])
-        elif is_down(p3d.KeyboardButton.ascii_key('1')):
-            p3d.loadPrcFileData('', 'coordinate-system zup_right')
-            right = p3d.Vec3.right()
-            forward = p3d.Vec3.forward()
-            up = p3d.Vec3.up()
-        elif is_down(p3d.KeyboardButton.ascii_key('2')):
-            p3d.loadPrcFileData('', 'coordinate-system yup_right')
-            right = p3d.Vec3.right()
-            forward = p3d.Vec3.forward()
-            up = p3d.Vec3.up()
-        elif is_down(p3d.KeyboardButton.ascii_key('3')):
-            p3d.loadPrcFileData('', 'coordinate-system zup_left')
-            right = p3d.Vec3.right()
-            forward = p3d.Vec3.forward()
-            up = p3d.Vec3.up()
-
 
         direct.task.TaskManagerGlobal.taskMgr.step()
 
